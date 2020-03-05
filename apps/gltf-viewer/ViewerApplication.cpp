@@ -138,6 +138,10 @@ int ViewerApplication::run()
       glGetUniformLocation(glslProgram.glId(), "uModelViewMatrix");
   const auto normalMatrixLocation =
       glGetUniformLocation(glslProgram.glId(), "uNormalMatrix");
+  const GLint lightDirectionLocation =
+      glGetUniformLocation(glslProgram.glId(), "uLightDirection");
+  const GLint lightIntensityLocation =
+      glGetUniformLocation(glslProgram.glId(), "uLightIntensity");
 
   tinygltf::Model model;
   if(!loadGltfFile(model)) {
@@ -174,12 +178,33 @@ int ViewerApplication::run()
   glEnable(GL_DEPTH_TEST);
   glslProgram.use();
 
+  // Light settings
+  glm::vec3 lightDirection(1., 1., 1.), lightIntensity(1., 1., 0.);
+  bool lightFromCamera = false;
+
   // Lambda function to draw the scene
   const auto drawScene = [&](const Camera &camera) {
     glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     const auto viewMatrix = camera.getViewMatrix();
+
+    if(lightIntensityLocation >= 0) {
+      glUniform3fv(lightIntensityLocation, 1, glm::value_ptr(lightIntensity));
+    }
+
+    if(lightIntensityLocation >= 0) {
+      glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(
+        glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.)))
+      ));
+    }
+
+    if(lightFromCamera) {
+      glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(glm::vec3(0, 0, 1)));
+    } else {
+      const glm::vec3 lightDirectionInViewSpace = glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.)));
+      glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(lightDirectionInViewSpace));
+    }
 
     // The recursive function that should draw a node
     // We use a std::function because a simple lambda cannot be recursive
@@ -285,6 +310,26 @@ int ViewerApplication::run()
           }
           cameraController->setCamera(currentCamera);
         }
+      }
+      if(ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+        static float theta = 0.f, phi = 0.f;
+        if( ImGui::SliderFloat("theta", &theta, 0, glm::pi<float>()) ||
+            ImGui::SliderFloat("phi", &phi, 0, 2.f * glm::pi<float>())) {
+            const float
+              sinPhi = glm::sin(phi),
+              cosPhi = glm::cos(phi),
+              sinTheta = glm::sin(theta),
+              cosTheta = glm::cos(theta);
+            lightDirection = glm::vec3(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi);
+        }
+
+        static glm::vec3 lightColor(1.f, 1.f, 1.f);
+        static float lightIntensityFactor = 1.f;
+        if( ImGui::ColorEdit3("color", (float *)&lightColor) ||
+            ImGui::InputFloat("intensity", &lightIntensityFactor)) {
+          lightIntensity = lightColor * lightIntensityFactor;
+        }
+        ImGui::Checkbox("light from camera", &lightFromCamera);
       }
       ImGui::End();
     }

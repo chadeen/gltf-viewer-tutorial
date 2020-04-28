@@ -179,7 +179,7 @@ int ViewerApplication::run()
   const GLint baseColorFactorLocation =
       glGetUniformLocation(glslProgram.glId(), "uBaseColorFactor");
   const GLint metallicFactorLocation =
-      glGetUniformLocation(glslProgram.glId(), "uMetallicFactorLocation");
+      glGetUniformLocation(glslProgram.glId(), "uMetallicFactor");
   const GLint roughnessFactorLocation =
       glGetUniformLocation(glslProgram.glId(), "uRoughnessFactor"); 
   const GLint metallicRoughnessTextureLocation =

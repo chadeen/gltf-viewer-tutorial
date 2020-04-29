@@ -157,6 +157,93 @@ std::vector<GLuint> ViewerApplication::createTextureObjects(const tinygltf::Mode
   return textureObjects;
 }
 
+void ViewerApplication::computeTangents(const tinygltf::Model & model, std::vector<glm::vec3> &tangents) {
+    std::vector<glm::vec3> primitivePoints(3);
+    if (model.defaultScene >= 0) {
+        tangents.clear();
+        const std::function<void(int, const glm::mat4 &)> updateTangents = [&](int nodeIdx, const glm::mat4 &parentMatrix) {
+            const auto &node = model.nodes[nodeIdx];
+            const glm::mat4 modelMatrix = getLocalToWorldMatrix(node, parentMatrix);
+            if (node.mesh >= 0) {
+                const auto &mesh = model.meshes[node.mesh];
+                tangents.resize(mesh.primitives.size());
+                for (size_t pIdx = 0; pIdx < mesh.primitives.size(); ++pIdx) {
+                    primitivePoints.clear();
+                    const auto &primitive = mesh.primitives[pIdx];
+                    const auto positionAttrIdxIt = primitive.attributes.find("POSITION");
+                    if (positionAttrIdxIt == end(primitive.attributes)) {
+                        continue;
+                    }
+                    const auto &positionAccessor = model.accessors[(*positionAttrIdxIt).second];
+                    if (positionAccessor.type != 3) {
+                        std::cerr << "Position accessor with type != VEC3, skipping" << std::endl;
+                        continue;
+                    }
+                    const auto &positionBufferView = model.bufferViews[positionAccessor.bufferView];
+                    const auto byteOffset = positionAccessor.byteOffset + positionBufferView.byteOffset;
+                    const auto &positionBuffer = model.buffers[positionBufferView.buffer];
+                    const auto positionByteStride = positionBufferView.byteStride ? positionBufferView.byteStride : 3 * sizeof(float);
+
+                    if (primitive.indices >= 0) {
+                        const auto &indexAccessor = model.accessors[primitive.indices];
+                        const auto &indexBufferView = model.bufferViews[indexAccessor.bufferView];
+                        const auto indexByteOffset = indexAccessor.byteOffset + indexBufferView.byteOffset;
+                        const auto &indexBuffer = model.buffers[indexBufferView.buffer];
+                        auto indexByteStride = indexBufferView.byteStride;
+
+                        switch (indexAccessor.componentType) {
+                            default:
+                                std::cerr
+                                    << "Primitive index accessor with bad componentType "
+                                    << indexAccessor.componentType << ", skipping it."
+                                    << std::endl;
+                                continue;
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                                indexByteStride = indexByteStride ? indexByteStride : sizeof(uint8_t);
+                                break;
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                                indexByteStride = indexByteStride ? indexByteStride : sizeof(uint16_t);
+                                break;
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                                indexByteStride = indexByteStride ? indexByteStride : sizeof(uint32_t);
+                                break;
+                        }
+
+                        for (size_t i = 0; i < indexAccessor.count; ++i) {
+                            uint32_t index = 0;
+                            switch (indexAccessor.componentType) {
+                                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                                    index = *((const uint8_t *)&indexBuffer.data[indexByteOffset + indexByteStride * i]);
+                                    break;
+                                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                                    index = *((const uint16_t *)&indexBuffer.data[indexByteOffset + indexByteStride * i]);
+                                    break;
+                                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                                    index = *((const uint32_t *)&indexBuffer.data[indexByteOffset + indexByteStride * i]);
+                                    break;
+                            }
+                            const auto &localPosition = *((const glm::vec3 *)&positionBuffer.data[byteOffset + positionByteStride * index]);
+                            primitivePoints[i] = glm::vec3(modelMatrix * glm::vec4(localPosition, 1.f));
+                        }
+                    } 
+                    else {
+                        for (size_t i = 0; i < positionAccessor.count; ++i) {
+                            const auto &localPosition = *((const glm::vec3 *)&positionBuffer.data[byteOffset + positionByteStride * i]);
+                            primitivePoints[i] = glm::vec3(modelMatrix * glm::vec4(localPosition, 1.f));
+                        }
+                    }
+                }
+            }
+            for(const auto childNodeIdx : node.children) {
+                updateTangents(childNodeIdx, modelMatrix);
+            }
+        };
+        for(const auto nodeIdx : model.scenes[model.defaultScene].nodes) {
+            updateTangents(nodeIdx, glm::mat4(1));
+        }
+    }
+}
+
 int ViewerApplication::run()
 {
   // Loader shaders
@@ -184,6 +271,8 @@ int ViewerApplication::run()
       glGetUniformLocation(glslProgram.glId(), "uRoughnessFactor"); 
   const GLint metallicRoughnessTextureLocation =
       glGetUniformLocation(glslProgram.glId(), "uMetallicRoughnessTexture");
+  const GLint normalTextureLocation =
+      glGetUniformLocation(glslProgram.glId(), "uNormalTexture");    
       
   tinygltf::Model model;
   if(!loadGltfFile(model)) {
@@ -234,7 +323,7 @@ int ViewerApplication::run()
   glslProgram.use();
 
   // Light settings
-  glm::vec3 lightDirection(1., 1., 1.), lightIntensity(0., 1., 1.);
+  glm::vec3 lightDirection(1., 1., 1.), lightIntensity(1., 1., 1.);
   bool lightFromCamera = false;
 
   const auto bindMaterial = [&](const int materialIndex) {
@@ -398,7 +487,7 @@ int ViewerApplication::run()
         }
       }
       if(ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-        static float theta = 0.f, phi = 0.f;
+        static float theta = glm::pi<float>()/4, phi = glm::pi<float>()/4;
         if( ImGui::SliderFloat("theta", &theta, 0, glm::pi<float>()) ||
             ImGui::SliderFloat("phi", &phi, 0, 2.f * glm::pi<float>())) {
             const float

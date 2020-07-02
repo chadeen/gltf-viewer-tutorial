@@ -533,6 +533,34 @@ ViewerApplication::ViewerApplication(const fs::path &appPath, uint32_t width,
     m_fragmentShader = fragmentShader;
   }
 
+/*
+  glGenFramebuffers(1, &m_GBufferFBO);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_GBufferFBO);
+  glGenTextures(GBufferTextureCount, m_GBufferTextures);
+  for(unsigned int i = GPosition; i < GBufferTextureCount; i++) {
+    glBindTexture(GL_TEXTURE_2D, m_GBufferTextures[i]);
+    glTexStorage2D(GL_TEXTURE_2D, 0, m_GBufferTextureFormat[i], width, height);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  }
+  for(unsigned int i = GPosition; i < GDepth; i++) {
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, m_GBufferTextures[i], 0);
+  }
+  glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_GBufferTextures[GDepth], 0);
+  GLenum drawBuffers[] = { 
+    GL_COLOR_ATTACHMENT0, 
+    GL_COLOR_ATTACHMENT1, 
+    GL_COLOR_ATTACHMENT2, 
+    GL_COLOR_ATTACHMENT3 
+  };
+  glDrawBuffers(4, drawBuffers);
+  GLenum status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+      std::cerr << "FB error, status: " << status << std::endl;
+      throw std::runtime_error("FBO error");
+  }
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); */
+
   ImGui::GetIO().IniFilename =
       m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows
                                   // positions in this file

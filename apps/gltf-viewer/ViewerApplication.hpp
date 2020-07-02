@@ -25,11 +25,30 @@ private:
     GLsizei count; // Number of elements in range
   };
 
+  enum GBufferTextureType {
+    GPosition = 0,
+    GNormal,
+    GAlbedo,
+    GSpecular,
+    GDepth,
+    GBufferTextureCount
+  };
+
   bool loadGltfFile(tinygltf::Model &model);
   std::vector<GLuint> createBufferObjects(const tinygltf::Model &model);
   std::vector<GLuint> createVertexArrayObjects(const tinygltf::Model &model, const std::vector<GLuint> &bufferObjects, std::vector<VaoRange> &meshIndexToVaoRange);
   std::vector<GLuint> createTextureObjects(const tinygltf::Model &model) const;
   void computeTangents(const tinygltf::Model & model, std::vector<glm::vec3> &tangents);
+
+  GLuint m_GBufferFBO;
+  GLuint m_GBufferTextures[GBufferTextureCount];
+  const GLenum m_GBufferTextureFormat[GBufferTextureCount] = { 
+    GL_RGBA32F, 
+    GL_RGBA32F, 
+    GL_RGBA, 
+    GL_RGBA,
+    GL_DEPTH_COMPONENT32F 
+  };
 
   GLsizei m_nWindowWidth = 1280;
   GLsizei m_nWindowHeight = 720;

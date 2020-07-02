@@ -45,9 +45,8 @@ vec4 SRGBtoLINEAR(vec4 srgbIn)
   return vec4(pow(srgbIn.xyz, vec3(GAMMA)), srgbIn.w);
 }
 
-void main()
-{
-  	vec3 N = normalize(vViewSpaceNormal);
+vec3 pbr_color() {
+	vec3 N = vViewSpaceNormal;
   	vec3 L = uLightDirection;
 	vec3 V = normalize(-vViewSpacePosition);
 	vec3 H = normalize(L + V);
@@ -95,5 +94,10 @@ void main()
 
 	vec3 f = f_diffuse + f_specular;
 
-  	fColor = LINEARtoSRGB(f * uLightIntensity * NdotL + emissive);
+  	return LINEARtoSRGB(f * uLightIntensity * NdotL + emissive);
+}
+
+void main()
+{
+  	fColor = pbr_color();
 }
